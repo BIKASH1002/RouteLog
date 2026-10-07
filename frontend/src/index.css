@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-slate-50 text-slate-700 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  h1, h2, h3, h4 {
+    @apply text-navy font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white border border-slate-200 rounded-xl shadow-card;
+  }
+  .card-pad {
+    @apply p-5;
+  }
+  .section-title {
+    @apply text-[15px] font-semibold text-navy flex items-center gap-2;
+  }
+  .label-xs {
+    @apply text-2xs font-medium uppercase tracking-wide text-slate-500;
+  }
+  .divider {
+    @apply border-t border-slate-200;
+  }
+}
