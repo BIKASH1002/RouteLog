@@ -1,6 +1,6 @@
 # RouteLog
 
-Automated trip planning and FMCSA daily log generation for property-carrying drivers.
+RouteLog is an automated trip planner and ELD log generator for property-carrying drivers. The HOS rules engine behind it enforces every constraint a driver operates under — driving limits, shift windows, mandatory breaks, fuel intervals, and the 70-hour weekly cycle. Every plan comes with 24-hour log sheets in FMCSA § 395.8 format, ready for the road.
 
 ## Architecture
 
