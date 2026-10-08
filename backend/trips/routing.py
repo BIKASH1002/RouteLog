@@ -1,4 +1,4 @@
-# Routing and geocoding via OpenRouteService.
+# Routing and geocoding via api.heigit.org.
 # Also provides polyline interpolation so the simulator's mile markers
 # can be mapped to exact lat/lng points for fuel / rest / pickup stops.
 
@@ -6,6 +6,7 @@ import logging
 import math
 from functools import lru_cache
 from typing import List
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class RoutingError(Exception):
 # ---------- geocoding ----------
 
 def _geocode_uncached(query: str, api_key: str) -> dict:
-    url = f"{ORS_BASE}/geocode/search"
+    url = f"{ORS_BASE}/pelias/v1/search"
     params = {
         "api_key": api_key,
         "text": query,
@@ -42,7 +43,6 @@ def _geocode_uncached(query: str, api_key: str) -> dict:
 
     f = features[0]
     lng, lat = f["geometry"]["coordinates"]
-    
     return {
         "lat": float(lat),
         "lng": float(lng),
@@ -60,16 +60,40 @@ def geocode(query: str, api_key: str) -> dict:
     return _geocode_cached(query.strip(), api_key)
 
 
+def geocode_candidates(query: str, api_key: str, size: int = 5) -> list:
+    if not api_key:
+        raise RoutingError("ORS_API_KEY not configured")
+
+    url = f"{ORS_BASE}/pelias/v1/search"
+    params = {"api_key": api_key, "text": query, "size": size}
+
+    try:
+        r = requests.get(url, params=params, timeout=15)
+    except requests.RequestException as e:
+        raise RoutingError(f"Geocode request failed: {e}")
+
+    if r.status_code != 200:
+        raise RoutingError(f"Geocode failed ({r.status_code}): {r.text[:200]}")
+
+    data = r.json()
+    out = []
+    for f in data.get("features") or []:
+        lng, lat = f["geometry"]["coordinates"]
+        out.append({
+            "label": f["properties"].get("label", query),
+            "lat": float(lat),
+            "lng": float(lng),
+        })
+    return out
+
+
 # ---------- directions ----------
 
 def _get_route_raw(coords: List[dict], api_key: str, profile: str) -> dict:
-    url = f"{ORS_BASE}/v2/directions/{profile}/geojson"
+    url = f"{ORS_BASE}/openrouteservice/v2/directions/{profile}/geojson"
     body = {
         "coordinates": [[c["lng"], c["lat"]] for c in coords],
         "units": "mi",
-        # Allow ORS to snap each waypoint to the nearest routable road
-        # within 5km. This handles WhosOnFirst centroids that land inside
-        # airports, parks, or industrial zones.
         "radiuses": [5000] * len(coords),
     }
     headers = {
@@ -99,9 +123,6 @@ def _get_route_raw(coords: List[dict], api_key: str, profile: str) -> dict:
 
 
 def get_route(coords: List[dict], api_key: str, profile: str = "driving-hgv") -> dict:
-    """
-    Fetch a route. Falls back to driving-car if driving-hgv fails.
-    """
     if not api_key:
         raise RoutingError("ORS_API_KEY not configured")
     if len(coords) < 2:
@@ -117,10 +138,6 @@ def get_route(coords: List[dict], api_key: str, profile: str = "driving-hgv") ->
 
 
 def get_route_with_fallback(coords: List[dict], api_key: str) -> dict:
-    """
-    Try driving-hgv first, then driving-car, then instruct a user-friendly
-    error. This shields callers from profile-specific routing gaps.
-    """
     try:
         return get_route(coords, api_key, profile="driving-hgv")
     except RoutingError as e:
@@ -134,6 +151,7 @@ def get_route_with_fallback(coords: List[dict], api_key: str) -> dict:
             f"Please use a city name or full street address. ({e})"
         )
 
+
 # ---------- polyline interpolation ----------
 
 def _haversine_miles(lat1, lng1, lat2, lng2) -> float:
@@ -143,7 +161,6 @@ def _haversine_miles(lat1, lng1, lat2, lng2) -> float:
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lng2 - lng1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    
     return 2 * R * math.asin(math.sqrt(a))
 
 
@@ -155,7 +172,6 @@ def build_polyline_index(geometry: List[List[float]]) -> dict:
             geometry[i][0], geometry[i][1],
         )
         cumulative.append(cumulative[-1] + d)
-    
     return {
         "geometry": geometry,
         "cumulative": cumulative,
@@ -186,41 +202,7 @@ def point_at_miles(index: dict, target_miles: float, total_route_miles: float) -
                 "lng": p1[1] + (p2[1] - p1[1]) * frac,
             }
     
-    return {"lat": geom[-1][0], "lng": geom[-1][1]}
-
-
-def geocode_candidates(query: str, api_key: str, size: int = 5) -> list:
-    """
-    Return up to `size` candidate matches for a location query.
-    Used by the frontend autocomplete dropdown.
-    """
-    if not api_key:
-        raise RoutingError("ORS_API_KEY not configured")
-
-    url = f"{ORS_BASE}/geocode/search"
-    params = {
-        "api_key": api_key, 
-        "text": query, 
-        "size": size,
-        "layers": "locality,region,country,postalcode",
+    return {
+        "lat": geom[-1][0], 
+        "lng": geom[-1][1]
     }
-
-    try:
-        r = requests.get(url, params=params, timeout=15)
-    except requests.RequestException as e:
-        raise RoutingError(f"Geocode request failed: {e}")
-
-    if r.status_code != 200:
-        raise RoutingError(f"Geocode failed ({r.status_code}): {r.text[:200]}")
-
-    data = r.json()
-    out = []
-    for f in data.get("features") or []:
-        lng, lat = f["geometry"]["coordinates"]
-        out.append({
-            "label": f["properties"].get("label", query),
-            "lat": float(lat),
-            "lng": float(lng),
-        })
-    
-    return out

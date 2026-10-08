@@ -80,7 +80,7 @@ class _Simulator:
             MAX_DRIVE_PER_SHIFT - self.drive_this_shift,
             MAX_WINDOW - self._window_elapsed(),
             BREAK_AFTER_DRIVING - self.drive_since_break,
-            remaining_cycle,  # <-- fix: never exceed the remaining 70-hour budget
+            remaining_cycle,  # Never exceed the remaining 70-hour budget
         ))
 
     def _add(self, status: Status, hours: float, miles: float = 0.0, note: str = ""):
