@@ -10,7 +10,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-ORS_BASE = "https://api.openrouteservice.org"
+ORS_BASE = "https://api.heigit.org"
 
 
 class RoutingError(Exception):
