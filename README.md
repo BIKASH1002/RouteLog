@@ -2,6 +2,41 @@
 
 Automated trip planning and FMCSA daily log generation for property-carrying drivers.
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph FE["🌐 Browser — Vercel"]
+        direction TB
+        Pages["Pages: Plan Trip · Trip Results · Daily Log Sheets"]
+        API["lib/api.ts — HTTP client"]
+        Pages --> API
+    end
+
+    subgraph BE["⚙️ Django Backend — Render"]
+        direction TB
+        Views["api.py — thin @api_view handlers"]
+        Helpers["helpers.py — orchestration"]
+        Pure["hos_engine.py · eld_logs.py · routing.py"]
+        Views --> Helpers --> Pure
+    end
+
+    subgraph DB["🗄️ Neon PostgreSQL"]
+        Tables[("8 normalised tables")]
+    end
+
+    ORS(["OpenRouteService<br/>geocode + routing"])
+
+    API ==>|"HTTPS / JSON"| Views
+    Pure ==>|"Django ORM"| Tables
+    Pure -.->|"external API"| ORS
+
+    style FE fill:#EFF6FF,stroke:#2563EB,stroke-width:2px,color:#1E3A8A
+    style BE fill:#F1F5F9,stroke:#0F172A,stroke-width:2px,color:#0F172A
+    style DB fill:#F0FDF4,stroke:#16A34A,stroke-width:2px,color:#14532D
+    style ORS fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#78350F
+```
+
 ## Stack
 
 - **Backend:** Django 5 + DRF + PostgreSQL
